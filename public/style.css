@@ -1,0 +1,112 @@
+body
+{
+    font-family: open-sans,sans-serif,arial;
+    padding: 70px 20px;
+    background: #333;
+}
+
+h1, h2
+{
+    text-align:center;
+    color: white;
+}
+
+form {
+    display: table;
+    margin: 30px auto;
+    position: relative;
+    list-style: none;
+    padding: 10px;
+    box-sizing: border-box;
+    width: 512px;
+    background: #fff;
+    text-align:center;
+    border-radius:4px;
+}
+
+#plot
+{
+    list-style: none;
+    padding: 0px;
+    box-sizing: content-box;
+    width: 512px;
+    height: 512px;
+    background: black;
+    position:relative;
+
+    /*pixelated http://phrogz.net/tmp/canvas_image_zoom.html*/
+    image-rendering:optimizeSpeed;             /* Legal fallback */
+    image-rendering:-moz-crisp-edges;          /* Firefox        */
+    image-rendering:-o-crisp-edges;            /* Opera          */
+    image-rendering:-webkit-optimize-contrast; /* Safari         */
+    image-rendering:optimize-contrast;         /* CSS3 Proposed  */
+    image-rendering:crisp-edges;               /* CSS4 Proposed  */
+    image-rendering:pixelated;                 /* CSS4 Proposed  */
+    -ms-interpolation-mode:nearest-neighbor;   /* IE8+           */
+}
+
+#events
+{
+    display: block;
+    margin: 30px auto;
+    position: relative;
+    list-style: none;
+    padding: 10px;
+    box-sizing: border-box;
+    width: 512px;
+    background: #222;
+    box-shadow:inset
+    text-align:center;
+    border-radius:4px;
+    box-shadow: inset 0px 2px 6px RGBa(0,0,0,0.2);
+    height: 150px;
+}
+
+#canvasContainer
+{
+    max-width:512px;
+    max-height:512px;
+    overflow:hidden;
+    border-radius:4px;
+    margin: 30px auto;
+    display: block;
+    position: relative;
+}
+
+#footnote
+{
+    text-align:center;
+    color:#ddd;
+    font-size:10px;
+}
+
+table
+{
+    margin: 0px auto;
+    text-align: center;
+}
+
+label
+{
+    color:#888;
+    font-size:10px;
+}
+
+input {
+    width: 80px;
+}
+
+input, button {
+    height: 28px;
+}
+
+#plot li
+{
+
+}
+
+#plot li:before
+{
+    content: "\25a0";
+    font-size:1px;
+}

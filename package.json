@@ -1,0 +1,11 @@
+{
+  "name": "mandelbrot_nodejs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "cluster.js",
+  "scripts": {
+    "start": "node cluster.js"
+  },
+  "author": "",
+  "license": "ISC"
+}

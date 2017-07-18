@@ -1,0 +1,33 @@
+<html>
+    <head>
+        <meta charset="utf-8"/>
+        <link href="style.css" rel="stylesheet" type="text/css">
+    </head>
+    <body>
+        <h1>NodeJS Mandelbrot</h1>
+        <div id="canvasContainer">
+            <canvas id="plot">
+            </canvas>
+        </div>
+        <form onSubmit="return false">
+            <table><tr>
+                <td><input id="param1" type="text" placeholder="x" value="-0.7"></input></td>
+                <td><input id="param2" type="text" placeholder="y" value="0"></input></td>
+                <td><input id="param3" type="text" placeholder="zoom" value="0.7"></input></td>
+                <td><input id="param4" type="text" placeholder="res" value="256"></input></td>
+                <td><button onClick="start()">calc</button></td>
+            </tr><tr>
+                <td><label>x</label></td>
+                <td><label>y</label></td>
+                <td><label>zoom</label></td>
+                <td><label>res</label></td>
+                <td></td>
+            </tr></table>
+        </form>
+        <!--<pre id="events">
+        </pre>-->
+        <h2 id="totaltime"></h2>
+        <h2 id="deltatime"></h2>
+        <script src="script.js"></script>
+    </body>
+</html>
