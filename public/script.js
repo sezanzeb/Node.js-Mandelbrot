@@ -188,8 +188,6 @@ function request(url,movex,movey,id)
                 result["movex"] = movex
                 result["movey"] = movey
 
-                context.fillStyle = lookupcolor(result.requestcount,id)
-
                 //will check wether or not it is time to render
                 render(result,id)
 
@@ -233,6 +231,8 @@ function request(url,movex,movey,id)
 
 function render(result,id)
 {
+    context.fillStyle = lookupcolor(result.requestcount,id)
+
     var rendertime = new Date().getTime()
     totalPoints = 0
     //draw
@@ -245,6 +245,7 @@ function render(result,id)
         //which consists of values like -1.2754 or 0.42809
         x = result.points[pointNr][0]*2 //because the client splits mandelbrot into 4 pieces
         y = result.points[pointNr][1]*2 //multiply each one by 2 (2*2=4)
+        a = result.points[pointNr][2] //alpha
         x = x+result.movex-2
         y = y+result.movey-2
         context.fillRect(x, y, 1, 1);

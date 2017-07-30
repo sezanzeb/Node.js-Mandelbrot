@@ -94,6 +94,8 @@ function initializeMB(state,mb_answer,size)
     state.allPointsC = new Array(size*size)
     state.allPointsZ = new Array(size*size)
     state.allPointsPx = new Array(size*size)
+    state.allPointsB = new Array(size)
+    console.log(size)
 
     //each item inside answer.points will get a unique identifier
     let pointNr = 0
@@ -103,25 +105,21 @@ function initializeMB(state,mb_answer,size)
     let cx = 0
     while(ci >= mb_answer.mini)
     {
+        state.allPointsB = new Array(size)
         cx = mb_answer.maxx
         while(cx >= mb_answer.minx)
         {
-            //it will leave out 2 circles that are known to remain black
-            if((cx+0.35)*(cx+0.35)+(ci*ci) > 0.14)
-            if((cx+1)*(cx+1)+(ci*ci) > 0.04)
-            //if((cx*cx)+(ci*ci) <= 4)
-            {
-                //add every point (except those inside the two circles) to state.allPoints
-                state.allPointsC[pointNr] = [
-                    cx, //will remain the same all the taim
-                    ci  //except that point diverges. then undefined will be assigned to it
-                ]
-                state.allPointsZ[pointNr] = [
-                    cx, //this is not redundant. it's zx and zi actually
-                    ci  //this array tuple is going to be overwritten with iteration results
-                ]
-                pointsinuse ++
-            }
+
+            //add every point to state.allPoints
+            state.allPointsC[pointNr] = [
+                cx, //will remain the same all the taim
+                ci  //except that point diverges. then undefined will be assigned to it
+            ]
+            state.allPointsZ[pointNr] = [
+                cx, //this is not redundant. it's zx and zi actually
+                ci  //this array tuple is going to be overwritten with iteration results
+            ]
+            pointsinuse ++
 
             //the array index
             pointNr += 1
@@ -173,12 +171,10 @@ function requestMB(state,mb_answer,size,pointstosend)
             {
                 //put this point into mb_answer.points
                 //the sever will send only those points that just diverged in the most recent iteration
-                state.allPointsPx[divergedPointsCount] = [
+                state.allPointsPx[pointNr] = [
                     parseFloat((state.allPointsC[pointNr][0] - mb_answer.minx)*size/mb_answer.width).toFixed(0),
-                    parseFloat((state.allPointsC[pointNr][1] - mb_answer.mini)*size/mb_answer.height).toFixed(0)
+                    parseFloat((state.allPointsC[pointNr][1] - mb_answer.mini)*size/mb_answer.height).toFixed(0),
                 ]
-
-                divergedPointsCount ++
 
                 //mark this point as "diverged". The loop will leave out points that are known to diverge
                 state.allPointsC[pointNr] = undefined
@@ -220,6 +216,7 @@ let server = http.createServer(function(request, response)
         state.allPointsC = []
         state.allPointsZ = []
         state.allPointsPx = []
+        state.allPointsB = []
 
         //initialize all the points that are going to be iterated. returns the amount of points
         let zoomfactorvalid = initializeMB(state,mb_answer,parsed.size)
