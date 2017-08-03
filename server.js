@@ -2,6 +2,7 @@
 
 let fs = require('fs')
 let http = require("http")
+let jpeg = require("jpeg-js")
 
 function decodeGetParams(url)
 {
@@ -74,7 +75,7 @@ function parseurl(path)
         "length":0,
         "requestcount":0,
         "points":[], //points that changed (diverged) go here
-        "iterations":10,
+        "iterations":20,
         "size":size
     }
 
@@ -283,6 +284,9 @@ let server = http.createServer(function(request, response)
                         mb_answer["requestcount"] = requestcount
                         calculateTime = new Date().getTime()
                         answer = JSON.stringify(mb_answer)
+                        storeasimage(mb_answer,id)
+                        //mb_answer.points is not needed anymore
+                        mb_answer.points = null
                         response.write("id:"+id+"\n")
                         response.write("data:"+answer+"\n\n")
 
@@ -353,6 +357,51 @@ let server = http.createServer(function(request, response)
         response.end()
     }
 })
+
+function storeasimage(mb_answer,id)
+{
+
+    let decodedBmpData = ""
+    let v
+    let width = mb_answer.points.length
+    let height = mb_answer.points[0].length
+
+    //create new img
+    for(let x = 0;x < width;x++)
+    {
+        for(let y = 0;y < height;y++)
+        {
+            v = mb_answer.points[x][y]
+            v = parseInt(Math.tanh(v/1000)*255).toString(16).toUpperCase()
+            if(v.length == 1)
+                v = "0" + v
+            v = v + v + v //RGB
+            decodedBmpData += v + "FF"
+        }
+    }
+
+    var newimg = {
+        "data": new Buffer(decodedBmpData,"hex"),
+        "width": width,
+        "height": height
+    }
+    //create new bmp from that
+    var newimgraw = jpeg.encode(newimg) //encoded, that means the weird character sequences again
+
+    //store bmp
+    /*fs.writeFile("out"+id+".jpg", newimgraw.data, function(err) {
+        if(err) return console.log(err)
+        console.log("The file was saved!");
+    });*/
+
+    mb_answer["image"] = new Buffer(newimgraw.data).toString('base64')
+}
+
+function readcompressedimage()
+{
+    let base64buddhabrot = "";
+    return base64buddhabrot
+}
 
 //wait for requests
 let port = 4000

@@ -40,10 +40,9 @@ var time,latency,starttime,totalPoints //statistics and time benchmarks
 
 //initialize canvas
 csssize = 512
-canvas = document.getElementById("plot")
+canvas = document.getElementById("streamimg")
 canvas.style.width = csssize+"px"
 canvas.style.height = csssize+"px"
-context = canvas.getContext("2d")
 
 //initial request
 start()
@@ -91,10 +90,6 @@ function start()
         canvas.height = size
     }
 
-    context.fillStyle = "black"
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    renderCrosshair()
-
     //get params from form
     var x = parseFloat(document.getElementById("param1").value)
     var y = parseFloat(document.getElementById("param2").value)
@@ -117,11 +112,11 @@ function start()
     {
         activestreams ++
         var id = 1
-        var url = encodeGetParams("/db.json",{x,y,zoom,"size":size/2,id})
+        var url = encodeGetParams("/db.json",{x,y,zoom,"size":size*2,id})
         //start requesting
         request(url,0,0,id)
     },1)
-    setTimeout(function()
+    /*setTimeout(function()
     {
         activestreams ++
         var id = 2
@@ -144,7 +139,7 @@ function start()
         var url = encodeGetParams("/db.json",{"x":x+pixelwidth,"y":y+pixelwidth,zoom,"size":size/2,id})
         //start requesting
         request(url,1,1,id)
-    },1)
+    },1)*/
 
     //don't redirect onclick on submit
     return false
@@ -158,7 +153,6 @@ function request(url,movex,movey,id)
         console.log("opening stream id: "+id)
         //log current time for the first time
         time = new Date().getTime() //updated after every datachunk
-        let firstmessageprocessed = false
 
         //on new message from stream
         source[id].addEventListener('message', function(e)
@@ -178,37 +172,25 @@ function request(url,movex,movey,id)
                 //parse data that the client received from the server
                 var result = JSON.parse(e.data)
 
-                if(result.requestcount > 2)
+                if(result.requestcount > 30)
                 {
                     source[id].close()
                     activestreams --
                     console.log("closed stream id: "+id+" because enough answers were received")
                     //don't return, rather render this last message
                 }
-
-                //store some offset info for the render function
-                result["movex"] = movex
-                result["movey"] = movey
-
-                //will check wether or not it is time to render
-                console.log("will not render because render() is commented")
-                if(!firstmessageprocessed) {
-                    render(result)
-                }
-
-                //display time that was needed for receiving and rendering
-                currenttime = new Date().getTime().toFixed(0)
-                document.getElementById("totaltime").innerHTML = "total: "+(currenttime-starttime)+"ms"
-                time = currenttime
-
-                //check if there is too few points that are being transfered because the image starts to converge
-                if(result.length <= 2 && firstmessageprocessed)
+                if(id == 1)
                 {
-                    source[id].close()
-                    activestreams --
-                    console.log("closed stream id: "+id+" because the image converged")
+
+                    //will check wether or not it is time to render
+                    //render(result)
+                    document.getElementById("streamimg").src = "data:image/jpeg;base64, " + result.image
+
+                    //display time that was needed for receiving and rendering
+                    currenttime = new Date().getTime().toFixed(0)
+                    document.getElementById("totaltime").innerHTML = "total: "+(currenttime-starttime)+"ms"
+                    time = currenttime
                 }
-                firstmessageprocessed = true
             }
         }, false);
         source[id].onerror = function(event)
@@ -232,75 +214,6 @@ function request(url,movex,movey,id)
 
     return false
 }
-
-
-function render(result)
-{
-
-    var rendertime = new Date().getTime()
-    totalPoints = 0
-    //draw
-    let x
-    let y
-
-    for(x = 0;x < canvas.width;x ++)
-    {
-        for(y = 0;y < canvas.height;y ++)
-        {
-            //check
-            if(result.points[x][y] != 0)
-            {
-                let v = result.points[x][y]
-                v = Math.tanh(v/62)*255
-                context.fillStyle = "RGB("+v+","+v+","+v+")"
-                //scale
-                let x2 = x*2 //because the client splits mandelbrot into 4 pieces
-                let y2 = y*2 //multiply each one by 2 (2*2=4)
-                //offset
-                x2 = x2+result.movex-2
-                y2 = y2+result.movey-2
-                //draw
-                context.fillRect(x2, y2, 1, 1)
-            }
-        }
-    }
-    //console.log("rendering of "+result.length+" points from stream id: "+id+" took "+parseFloat(new Date().getTime()-rendertime)+"ms")
-
-    renderCrosshair()
-}
-
-
-//show centered crosshair
-function renderCrosshair()
-{
-    context.fillStyle = "white"
-
-    linelength = Math.round(size/40)
-
-    if(size < 60)
-        return
-
-    if(size < 100)
-    {
-        context.fillRect(Math.round(canvas.width/2)-1, Math.round(canvas.height/2)-1, 1, 1)
-    }
-    else
-    {
-        //border
-        /*context.fillStyle = "black"
-        context.fillRect(Math.round(canvas.width/2-linelength-1-1),    Math.round(canvas.height/2)-1-1,                   linelength+2, 1+2) //left
-        context.fillRect(Math.round(canvas.width/2-1),                 Math.round(canvas.height/2-linelength-1)-1-1,      1+2, linelength+2) //top
-        context.fillRect(Math.round(canvas.width/2+2-1),               Math.round(canvas.height/2)-1-1,                   linelength+2, 1+2) //right
-        context.fillRect(Math.round(canvas.width/2-1),                 Math.round(canvas.height/2+2)-1-1,                 1+2, linelength+2) //bottom*/
-
-        //cross
-        context.fillRect(Math.round(canvas.width/2-linelength-1),    Math.round(canvas.height/2)-1,                   linelength, 1) //left
-        context.fillRect(Math.round(canvas.width/2),                 Math.round(canvas.height/2-linelength-1)-1,      1, linelength) //top
-        context.fillRect(Math.round(canvas.width/2+2),               Math.round(canvas.height/2)-1,                   linelength, 1) //right
-        context.fillRect(Math.round(canvas.width/2),                 Math.round(canvas.height/2+2)-1,                 1, linelength) //bottom
-    }
-}
-
 
 
 
