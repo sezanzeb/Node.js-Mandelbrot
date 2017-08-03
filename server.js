@@ -388,7 +388,7 @@ function storeasimage(state,mb_answer,id)
     let v,r,g,b
     let width = state.allPointsB.length
     let height = state.allPointsB[0].length
-    let stretch = 1000;
+    let stretch = 10000;
 
     //create new img
     for(let x = 0;x < width;x++)
@@ -405,9 +405,6 @@ function storeasimage(state,mb_answer,id)
             g = parseInt(g).toString(16).toUpperCase()
             b = parseInt(b).toString(16).toUpperCase()
 
-            v = parseInt(Math.tanh(v/1000)*255).toString(16).toUpperCase()
-
-            if(v.length == 1) v = "0" + v
             if(r.length == 1) r = "0" + r
             if(g.length == 1) g = "0" + g
             if(b.length == 1) b = "0" + b

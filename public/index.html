@@ -10,15 +10,15 @@
         </div>
         <form onSubmit="return false">
             <table><tr>
-                <td><input id="param1" type="text" placeholder="x" value="-0.7"></input></td>
-                <td><input id="param2" type="text" placeholder="y" value="0"></input></td>
-                <td><input id="param3" type="text" placeholder="zoom" value="0.7"></input></td>
-                <td><input id="param4" type="text" placeholder="res" value="256"></input></td>
+                <td class="hidden"><input id="param1" type="text" placeholder="x" value="-0.7"></input></td>
+                <td class="hidden"><input id="param2" type="text" placeholder="y" value="0"></input></td>
+                <td class="hidden"><input id="param3" type="text" placeholder="zoom" value="0.7"></input></td>
+                <td><input id="param4" type="text" placeholder="res" value="128"></input></td>
                 <td><button onClick="start()">calc</button></td>
             </tr><tr>
-                <td><label>x</label></td>
-                <td><label>y</label></td>
-                <td><label>zoom</label></td>
+                <td class="hidden"><label>x</label></td>
+                <td class="hidden"><label>y</label></td>
+                <td class="hidden"><label>zoom</label></td>
                 <td><label>res</label></td>
                 <td></td>
             </tr></table>

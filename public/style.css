@@ -5,6 +5,11 @@ body
     background: #271e2f;
 }
 
+.hidden
+{
+    display:none;
+}
+
 #streamimg
 {
     width:512px;
