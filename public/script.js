@@ -163,9 +163,10 @@ function request(url,movex,movey,id)
         //on new message from stream
         source[id].addEventListener('message', function(e)
         {
+            //is there anything?
             if(e.data != "")
             {
-
+                //at some point the server might complain and not send anything at all
                 if(e.data == "zoomfactorinvalid")
                 {
                     console.log("message from server: The zoom factor is too large (stream id: "+id+"); closing stream")
@@ -177,7 +178,7 @@ function request(url,movex,movey,id)
                 //parse data that the client received from the server
                 var result = JSON.parse(e.data)
 
-                if(result.requestcount > 250)
+                if(result.requestcount > 2)
                 {
                     source[id].close()
                     activestreams --
@@ -185,11 +186,15 @@ function request(url,movex,movey,id)
                     //don't return, rather render this last message
                 }
 
+                //store some offset info for the render function
                 result["movex"] = movex
                 result["movey"] = movey
 
                 //will check wether or not it is time to render
-                render(result,id)
+                console.log("will not render because render() is commented")
+                if(!firstmessageprocessed) {
+                    render(result)
+                }
 
                 //display time that was needed for receiving and rendering
                 currenttime = new Date().getTime().toFixed(0)
@@ -229,26 +234,35 @@ function request(url,movex,movey,id)
 }
 
 
-function render(result,id)
+function render(result)
 {
-    context.fillStyle = lookupcolor(result.requestcount,id)
 
     var rendertime = new Date().getTime()
     totalPoints = 0
     //draw
-    var pointNr
-    var x
-    var y
-    for(pointNr = 0; pointNr < result.length; pointNr ++)
+    let x
+    let y
+
+    for(x = 0;x < canvas.width;x ++)
     {
-        //calculate the position in px (from 0 to 512) from the mathematical position,x
-        //which consists of values like -1.2754 or 0.42809
-        x = result.points[pointNr][0]*2 //because the client splits mandelbrot into 4 pieces
-        y = result.points[pointNr][1]*2 //multiply each one by 2 (2*2=4)
-        a = result.points[pointNr][2] //alpha
-        x = x+result.movex-2
-        y = y+result.movey-2
-        context.fillRect(x, y, 1, 1);
+        for(y = 0;y < canvas.height;y ++)
+        {
+            //check
+            if(result.points[x][y] != 0)
+            {
+                let v = result.points[x][y]
+                v = Math.tanh(v/62)*255
+                context.fillStyle = "RGB("+v+","+v+","+v+")"
+                //scale
+                let x2 = x*2 //because the client splits mandelbrot into 4 pieces
+                let y2 = y*2 //multiply each one by 2 (2*2=4)
+                //offset
+                x2 = x2+result.movex-2
+                y2 = y2+result.movey-2
+                //draw
+                context.fillRect(x2, y2, 1, 1)
+            }
+        }
     }
     //console.log("rendering of "+result.length+" points from stream id: "+id+" took "+parseFloat(new Date().getTime()-rendertime)+"ms")
 

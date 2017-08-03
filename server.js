@@ -73,117 +73,153 @@ function parseurl(path)
         "zoom":zoom,
         "length":0,
         "requestcount":0,
-        "points":[] //points that changed (diverged) go here
+        "points":[], //points that changed (diverged) go here
+        "iterations":10,
+        "size":size
     }
 
     return {mb_answer,size,id}
 }
 
-function initializeMB(state,mb_answer,size)
+function initializeMB(state,mb_answer)
 {
     let width = Math.abs(mb_answer.maxx-mb_answer.minx)
     let height = Math.abs(mb_answer.maxi-mb_answer.mini)
-    let stepi = height/size
-    let stepx = width/size
+    let stepi = height/mb_answer.size
+    let stepx = width/mb_answer.size
     let pointsinuse = 0
 
     //check if this loop will ever come to an end. An issue that might be the case for very large zoom factors
     if(1-stepx == 1)
         return -1
 
-    state.allPointsC = new Array(size*size)
-    state.allPointsZ = new Array(size*size)
-    state.allPointsPx = new Array(size*size)
-    state.allPointsB = new Array(size)
-    console.log(size)
+    state.allPointsC = new Array(mb_answer.size) //contains the counter for buddhabrot e.g [67,132] = 5
+    state.allPointsZ = new Array(mb_answer.size) //contains tuples for the logic coordinate system. e.g. [57,142] = [0.12,-0.87]
+    state.allPointsB = new Array(mb_answer.size) //iteration of mandelbrot results, means to which point in the logic coordinate system the point moves. e.g. [47,97] = [0.22,-0.76]
 
     //each item inside answer.points will get a unique identifier
     let pointNr = 0
 
     //iterate over each point in the visible coordinate system
-    let ci = mb_answer.maxi
-    let cx = 0
-    while(ci >= mb_answer.mini)
-    {
-        state.allPointsB = new Array(size)
-        cx = mb_answer.maxx
-        while(cx >= mb_answer.minx)
-        {
+    //logic position counters
+    let ci //is going to be set inside the loop
+    let cx = mb_answer.minx
 
+    //indexes
+    //px position counters - 1
+    let ii = 0
+    let ix = 0
+
+    while(cx <= mb_answer.maxx)
+    {
+
+        //2D array of all pixels
+        state.allPointsC[ix] = new Array(mb_answer.size)
+        state.allPointsZ[ix] = new Array(mb_answer.size)
+        state.allPointsB[ix] = new Array(mb_answer.size)
+
+        ci = mb_answer.mini
+        ii = 0
+        while(ci <= mb_answer.maxi)
+        {
             //add every point to state.allPoints
-            state.allPointsC[pointNr] = [
-                cx, //will remain the same all the taim
+            state.allPointsC[ix][ii] = [
+                cx, //will remain the same all the time
                 ci  //except that point diverges. then undefined will be assigned to it
             ]
-            state.allPointsZ[pointNr] = [
+            state.allPointsZ[ix][ii] = [
                 cx, //this is not redundant. it's zx and zi actually
                 ci  //this array tuple is going to be overwritten with iteration results
             ]
+            state.allPointsB[ix][ii] = 0 //this is the counter of how many points touched this position
             pointsinuse ++
 
-            //the array index
-            pointNr += 1
-
-            //go to next pixel
-            cx -= stepx
+            //go to next line
+            ci += stepi
+            ii ++
         }
-        //go to next line
-        ci -= stepi
+
+        //go to next pixel/point
+        cx += stepx
+        ix ++
     }
     return 1
 }
 
-function requestMB(state,mb_answer,size,pointstosend)
+function logicToPxX(x,params)
+{
+    return(Math.round((x-params.minx)*params.size/params.width))
+}
+
+function logicToPxI(i,params)
+{
+    return(Math.round((i-params.mini)*params.size/params.height))
+}
+
+//calculate one mandelbrot iteration
+function requestMB(state,mb_answer,pointstosend)
 {
     //index inside the array that is being sent to the client
     let divergedPointsCount = 0
 
     //go through all points, they are initialized in initializeMB()
-    let pointNr
-    let zx
-    let zi
-    let dist
-    let zj
-    for(pointNr = 0;pointNr < state.allPointsC.length;pointNr ++)
+    let ix //point index + 1 of x-axis
+    let ii //point index +1 of imaginary-axis
+
+    let zx //position on x-axis after one mandelbrot iteration
+    let zi //position on imaginary-axis after one mandelbrot iteration
+    let zj //basically zitmp
+    let dist //to check wether or not a point diverged
+
+    for(ix = 0;ix < state.allPointsC.length;ix ++)
     {
-        //only points that did not diverge
-        if(state.allPointsC[pointNr] != undefined)
+        for(ii = 0;ii < state.allPointsC[ix].length;ii ++)
         {
-            //do a mandelbrot iteration
-            zx = state.allPointsZ[pointNr][0]
-            zi = state.allPointsZ[pointNr][1]
-            dist = Math.abs(Math.pow(zx,2)+Math.pow(zi,2))
-
-            //check if this point diverges or not
-            if(dist < 4) //does not converge //pythagoras squared (no sqrt)
+            //only points that did not diverge
+            if(state.allPointsC[ix][ii] != undefined)
             {
-                //then do an iteartion. next time the server will check wether or not this diverges (dist larger than two)
-                //allPointsC holds the points from the last requestMB call
-                zj = zi //store old zi value in zj, because...
-                zi = 2*zx*zi + state.allPointsC[pointNr][1] //...zi is going to be overwritten now...
-                zx = zx*zx - zj*zj + state.allPointsC[pointNr][0] //...but needs to be here for one more calculation
+                zx = state.allPointsZ[ix][ii][0]
+                zi = state.allPointsZ[ix][ii][1]
 
-                //state.allPointsZ holds the information for the server needed to calculate the fractal
-                state.allPointsZ[pointNr][0] = zx
-                state.allPointsZ[pointNr][1] = zi
-            }
-            else //converges
-            {
-                //put this point into mb_answer.points
-                //the sever will send only those points that just diverged in the most recent iteration
-                state.allPointsPx[pointNr] = [
-                    parseFloat((state.allPointsC[pointNr][0] - mb_answer.minx)*size/mb_answer.width).toFixed(0),
-                    parseFloat((state.allPointsC[pointNr][1] - mb_answer.mini)*size/mb_answer.height).toFixed(0),
-                ]
+                //check if this point diverged in the recent iteration or not
+                //then do a mandelbrot iteration
+                //do a few iteration, each time update Buddhabrot values
+                let i
+                for(i = 0;i < mb_answer.iterations;i++)
+                {
 
-                //mark this point as "diverged". The loop will leave out points that are known to diverge
-                state.allPointsC[pointNr] = undefined
+                    //mb_answer contains min and width info
+                    let pxzx = logicToPxX(zx,mb_answer)
+                    let pxzi = logicToPxI(zi,mb_answer)
+                    //if this logic point exists within the array
+                    if(state.allPointsB[pxzx] != undefined && state.allPointsB[pxzi] != undefined)
+                    {
+                        state.allPointsB[pxzx][pxzi] = state.allPointsB[pxzx][pxzi] + 1
+                    }
+                    else
+                    {
+                        //mark this point as "diverged". The loop will leave out points that are known to diverge
+                        state.allPointsC[ix][ii] = undefined
+                        break
+                    }
+
+                    //then continue and do a iteartion. next time the server will check wether or not this diverges ((sqrt(dist) larger than 2))
+                    //allPointsC holds the points from the last requestMB call
+                    zj = zi //store old zi value in zj, because...
+                    zi = 2*zx*zi + state.allPointsC[ix][ii][1] //...zi is going to be overwritten now...
+                    zx = zx*zx - zj*zj + state.allPointsC[ix][ii][0] //...but needs to be here for one more calculation
+
+                }
+
+                //state.allPointsZ holds the information for the server needs to calculate the fractal
+                state.allPointsZ[ix][ii][0] = zx //store logic position inside indexed array
+                state.allPointsZ[ix][ii][1] = zi //store logic position inside indexed array
             }
         }
     }
 
     //take slice from state.allPointsC and store it inside mb_answer
-    mb_answer.points = state.allPointsPx.slice(0,divergedPointsCount)
+    mb_answer.points = state.allPointsB
     mb_answer.length = divergedPointsCount
 }
 
@@ -215,11 +251,10 @@ let server = http.createServer(function(request, response)
         let state = {}
         state.allPointsC = []
         state.allPointsZ = []
-        state.allPointsPx = []
         state.allPointsB = []
 
         //initialize all the points that are going to be iterated. returns the amount of points
-        let zoomfactorvalid = initializeMB(state,mb_answer,parsed.size)
+        let zoomfactorvalid = initializeMB(state,mb_answer)
         if(zoomfactorvalid == -1)
         {
             console.log("the zoom factor is too large")
@@ -237,27 +272,30 @@ let server = http.createServer(function(request, response)
         {
             if(request.socket._handle != null)
             {
-                if(request.socket._handle.writeQueueSize <= 5)
+                //if the client is unable to process all the messages
+                if(request.socket._handle.writeQueueSize <= 4)
                 {
-
-                    requestMB(state,mb_answer,parsed.size)
+                    //calculate now
+                    requestMB(state,mb_answer)
                     if(mb_answer.points.length > 0)
                     {
+                        //send the calculated array
                         mb_answer["requestcount"] = requestcount
                         calculateTime = new Date().getTime()
                         answer = JSON.stringify(mb_answer)
                         response.write("id:"+id+"\n")
                         response.write("data:"+answer+"\n\n")
-                        mb_answer.points = []
+
+                        mb_answer.points = [] //reset the array after answer has been sent
                         requestcount ++
                     }
                     else
                     {
                         //if no point has been found within 5 seconds, close the stream
-                        if(new Date().getTime() - calculateTime > 5000)
+                        if(new Date().getTime() - calculateTime > 1000)
                         {
                             clearInterval(interval);
-                            console.log("no more points found for stream id: "+id)
+                            console.log("no more points found timeout for stream id: "+id)
                             //free up memory
                             state = {}
                             mb_answer = {}
