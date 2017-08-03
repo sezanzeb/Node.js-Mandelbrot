@@ -112,7 +112,7 @@ function start()
     {
         activestreams ++
         var id = 1
-        var url = encodeGetParams("/db.json",{x,y,zoom,"size":size*2,id})
+        var url = encodeGetParams("/db.json",{x,y,zoom,"size":size,id})
         //start requesting
         request(url,0,0,id)
     },1)
@@ -172,7 +172,7 @@ function request(url,movex,movey,id)
                 //parse data that the client received from the server
                 var result = JSON.parse(e.data)
 
-                if(result.requestcount > 30)
+                if(result.requestcount > 500)
                 {
                     source[id].close()
                     activestreams --
@@ -184,7 +184,7 @@ function request(url,movex,movey,id)
 
                     //will check wether or not it is time to render
                     //render(result)
-                    document.getElementById("streamimg").src = "data:image/jpeg;base64, " + result.image
+                    document.getElementById("streamimg").src = "data:image/bmp;base64, " + result.image
 
                     //display time that was needed for receiving and rendering
                     currenttime = new Date().getTime().toFixed(0)

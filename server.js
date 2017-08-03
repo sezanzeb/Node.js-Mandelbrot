@@ -2,7 +2,7 @@
 
 let fs = require('fs')
 let http = require("http")
-let jpeg = require("jpeg-js")
+let bmp = require("bmp-js")
 
 function decodeGetParams(url)
 {
@@ -75,7 +75,7 @@ function parseurl(path)
         "length":0,
         "requestcount":0,
         "points":[], //points that changed (diverged) go here
-        "iterations":20,
+        "iterations":40,
         "size":size
     }
 
@@ -147,14 +147,47 @@ function initializeMB(state,mb_answer)
     return 1
 }
 
-function logicToPxX(x,params)
+function interpolateBuddhacounter(x,i,params,state)
 {
-    return(Math.round((x-params.minx)*params.size/params.width))
+    //convert to px coordinate system, but don't round it
+    x = (x-params.minx)*params.size/params.width
+    i = (i-params.mini)*params.size/params.height
+
+    //increment state.allPointsB according to interpolation
+    let x_ri = Math.ceil(x)
+    let i_up = Math.ceil(i)
+    let x_le = Math.floor(x)
+    let i_do = Math.floor(i)
+
+    //those 4 integers represent the boundaries of the 4 pixels that need to be interpolated
+
+    //now get the weights. it's the rectangle area between the point x,i and the edge
+    //make sure it's positive and substract it from one, because large area means x,i is far away from that edge
+    let w00 = 1-Math.abs((x_le-x) * (i_do-i))
+    let w01 = 1-Math.abs((x_le-x) * (i_up-i))
+    let w10 = 1-Math.abs((x_ri-x) * (i_do-i))
+    let w11 = 1-Math.abs((x_ri-x) * (i_up-i))
+
+    //now add the weights from the positions in state.allPointsB
+    //the indices might not exist, that's why try catch
+
+    if(trytoadd(state,x_ri,i_up,w11) == 1)
+    if(trytoadd(state,x_ri,i_do,w10) == 1)
+    if(trytoadd(state,x_le,i_up,w01) == 1)
+    if(trytoadd(state,x_le,i_do,w00) == 1)
+        return 1
+
+    return -1
 }
 
-function logicToPxI(i,params)
+function trytoadd(state,x,i,w)
 {
-    return(Math.round((i-params.mini)*params.size/params.height))
+    if(state.allPointsB[x] != undefined && state.allPointsB[x][i] != undefined)
+    {
+        state.allPointsB[x][i] += w
+        return 1
+    }
+    return -1
 }
 
 //calculate one mandelbrot iteration
@@ -190,16 +223,8 @@ function requestMB(state,mb_answer,pointstosend)
                 {
 
                     //mb_answer contains min and width info
-                    let pxzx = logicToPxX(zx,mb_answer)
-                    let pxzi = logicToPxI(zi,mb_answer)
-                    //if this logic point exists within the array
-                    if(state.allPointsB[pxzx] != undefined && state.allPointsB[pxzi] != undefined)
+                    if(interpolateBuddhacounter(zx,zi,mb_answer,state) == -1)
                     {
-                        state.allPointsB[pxzx][pxzi] = state.allPointsB[pxzx][pxzi] + 1
-                    }
-                    else
-                    {
-                        //mark this point as "diverged". The loop will leave out points that are known to diverge
                         state.allPointsC[ix][ii] = undefined
                         break
                     }
@@ -220,7 +245,7 @@ function requestMB(state,mb_answer,pointstosend)
     }
 
     //take slice from state.allPointsC and store it inside mb_answer
-    mb_answer.points = state.allPointsB
+    state.allPointsB = state.allPointsB
     mb_answer.length = divergedPointsCount
 }
 
@@ -278,19 +303,17 @@ let server = http.createServer(function(request, response)
                 {
                     //calculate now
                     requestMB(state,mb_answer)
-                    if(mb_answer.points.length > 0)
+                    //perform the sending of the data asynchronous
+                    if(state.allPointsB.length > 0)
                     {
                         //send the calculated array
                         mb_answer["requestcount"] = requestcount
                         calculateTime = new Date().getTime()
+                        storeasimage(state,mb_answer,id)
                         answer = JSON.stringify(mb_answer)
-                        storeasimage(mb_answer,id)
-                        //mb_answer.points is not needed anymore
-                        mb_answer.points = null
+
                         response.write("id:"+id+"\n")
                         response.write("data:"+answer+"\n\n")
-
-                        mb_answer.points = [] //reset the array after answer has been sent
                         requestcount ++
                     }
                     else
@@ -358,24 +381,37 @@ let server = http.createServer(function(request, response)
     }
 })
 
-function storeasimage(mb_answer,id)
+function storeasimage(state,mb_answer,id)
 {
 
     let decodedBmpData = ""
-    let v
-    let width = mb_answer.points.length
-    let height = mb_answer.points[0].length
+    let v,r,g,b
+    let width = state.allPointsB.length
+    let height = state.allPointsB[0].length
+    let stretch = 1000;
 
     //create new img
     for(let x = 0;x < width;x++)
     {
         for(let y = 0;y < height;y++)
         {
-            v = mb_answer.points[x][y]
+            v = state.allPointsB[x][y]
+
+            r = Math.pow(Math.tanh(v/stretch),2)*255*0.8
+            g = Math.pow(Math.tanh(v/stretch),1)*255
+            b = Math.pow(Math.tanh(v/stretch),0.5)*255*0.9+25
+
+            r = parseInt(r).toString(16).toUpperCase()
+            g = parseInt(g).toString(16).toUpperCase()
+            b = parseInt(b).toString(16).toUpperCase()
+
             v = parseInt(Math.tanh(v/1000)*255).toString(16).toUpperCase()
-            if(v.length == 1)
-                v = "0" + v
-            v = v + v + v //RGB
+
+            if(v.length == 1) v = "0" + v
+            if(r.length == 1) r = "0" + r
+            if(g.length == 1) g = "0" + g
+            if(b.length == 1) b = "0" + b
+            v = r + g + b //RGB
             decodedBmpData += v + "FF"
         }
     }
@@ -386,7 +422,7 @@ function storeasimage(mb_answer,id)
         "height": height
     }
     //create new bmp from that
-    var newimgraw = jpeg.encode(newimg) //encoded, that means the weird character sequences again
+    var newimgraw = bmp.encode(newimg) //encoded, that means the weird character sequences again
 
     //store bmp
     /*fs.writeFile("out"+id+".jpg", newimgraw.data, function(err) {
@@ -395,12 +431,6 @@ function storeasimage(mb_answer,id)
     });*/
 
     mb_answer["image"] = new Buffer(newimgraw.data).toString('base64')
-}
-
-function readcompressedimage()
-{
-    let base64buddhabrot = "";
-    return base64buddhabrot
 }
 
 //wait for requests

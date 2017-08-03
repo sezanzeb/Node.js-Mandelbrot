@@ -2,13 +2,14 @@ body
 {
     font-family: open-sans,sans-serif,arial;
     padding: 70px 20px;
-    background: #333;
+    background: #271e2f;
 }
 
 #streamimg
 {
     width:512px;
     height:512px;
+    image-rendering: optimizespeed;
 }
 
 h1, h2
