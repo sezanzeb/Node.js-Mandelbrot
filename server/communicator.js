@@ -24,7 +24,7 @@ let server = http.createServer(function(clientrequest, clientresponse)
     {
 
         //initialize the connection
-        log("client requesting stream")
+        log("client requesting bmp stream")
         clientresponse.writeHead(200, {"Content-Type":"text/event-stream", "Cache-Control":"no-cache", "Connection":"keep-alive"})
         clientresponse.write('\n\n');
 
@@ -49,7 +49,7 @@ let server = http.createServer(function(clientrequest, clientresponse)
                 {
                     //request from port 4000 as stream
                     let completemessage = ""
-                    log("opening stream id: "+id)
+                    log("opening stream for client. id: "+id)
                     let buddharesponse
                     request.get("http://www.localhost:4000" + path).on("response", (buddharesponsetmp) =>
                     {
@@ -217,6 +217,7 @@ function storeasimage(mb_answer)
 //wait for requests
 let port = 4001
 server.listen(port)
+log("communicator/converter ready")
 log("listening on port "+port+" for browser requests...")
 
 

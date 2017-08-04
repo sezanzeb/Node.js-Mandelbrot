@@ -1,20 +1,17 @@
 
-# Node.js-Mandelbrot
-- streams the data as soon as new divergent points are found
-- scales to 4 cores on the server as cluster
-- colored and it will build up on your screen
+# Node.js-Buddhabrot
+- client requests website at localhost:4001
+- 4001 sends the website html data
+- 4001 requests the buddhabrot raw data at 4000 (which is another process spawned by "cluster")
+- 4000 starts streaming raw data to 4001
+- as data arrives at 4001, 4001 encodes the data to base64 bmp files. In the meantime 4000 continues to calculate the next raw data cunk
+- 4001 streams the bmp files to the client
+- client displays the newly arrived bmp
 
 ## installation
 
+      npm install
       npm start
       #then open Firefox or Chromium and visit localhost:4000
-    
-<sup>*The rendering is smoother in chromium than in firefox.*</sup>
 
-<sup>*No need to 'npm install', as it only depends on fs, cluster and http.*</sup>
-
-<sup>*If it doesn't render with a specific configuration, please take a look at the console. It might be that you zoomed in so deep, so that the datatypes can't handle the precision anymore, or that the server only sees points that don't diverge in the current window.*</sup>
-
-<sup>*It can be run without a cluster single-threaded by using 'node server.js'.*</sup>
-
-![Screenshot](https://github.com/sezanzeb/Node.js-Mandelbrot/raw/master/mandelbrot.png)
+![Screenshot](https://github.com/sezanzeb/Node.js-Mandelbrot/raw/buddhabrot/buddhabrot.png)

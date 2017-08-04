@@ -262,7 +262,6 @@ let server = http.createServer(function(request, response)
     let answer = ""
 
     //initialize the connection
-    log("communicator requesting stream")
     response.writeHead(200, {"Content-Type":"text/event-stream", "Cache-Control":"no-cache", "Connection":"keep-alive"})
     response.write('\n\n');
 
@@ -275,6 +274,8 @@ let server = http.createServer(function(request, response)
     state.allPointsZ = []
     state.allPointsB = []
 
+    log("communicator requesting raw data. opening stream id: "+id)
+    
     //initialize all the points that are going to be iterated. returns the amount of points
     let zoomfactorvalid = initializeMB(state,mb_answer)
     if(zoomfactorvalid == -1)
@@ -303,7 +304,7 @@ let server = http.createServer(function(request, response)
                 requestMB(state,mb_answer)
 
                 if(requestcount%5 == 0 && requestcount != 0)
-                    log("iterations: "+requestcount)
+                    log("raw data chunks sent: "+requestcount)
 
                 //some statistical stuff
                 mb_answer.requestcount = requestcount
@@ -325,33 +326,42 @@ let server = http.createServer(function(request, response)
             }
             else
             {
+                if(running) //if not already closed
+                {
+                    running = false
+                    log("communicator seems to be shut down. closing stream id : "+id)
+                    //free up memory
+                    state = {}
+                    mb_answer = {}
+                    response.end()
+                }
+            }
+        }
+        else
+        {
+            if(running) //if not already closed
+            {
                 running = false
-                log("closed because writeQueueSize is too lage; stream id: "+id)
+                log("closed because _handle is null; stream id: "+id)
                 //free up memory
                 state = {}
                 mb_answer = {}
                 response.end()
             }
         }
-        else
+    }
+
+    request.connection.addListener("close", function ()
+    {
+        if(running) //if not already closed
         {
             running = false
-            log("closed because _handle is null; stream id: "+id)
+            log("communicator closed stream id: "+id)
             //free up memory
             state = {}
             mb_answer = {}
             response.end()
         }
-    }
-
-    request.connection.addListener("close", function ()
-    {
-        running = false
-        log("communicator closed stream id: "+id)
-        //free up memory
-        state = {}
-        mb_answer = {}
-        response.end()
     }, false);
     return 0
 })
@@ -364,6 +374,7 @@ function log(msg)
 //wait for requests
 let port = 4000
 server.listen(port)
+log("raw data calculator ready")
 log("listening on port "+port+"...")
 
 
