@@ -78,7 +78,7 @@ function parseurl(path)
         "zoom":zoom,
         "length":0,
         "requestcount":0,
-        "iterations":40,
+        "iterations":20,
         "size":size
     }
 
@@ -203,7 +203,6 @@ function trytoadd(state,x,i,w)
 //and then the result will be written to the client
 function requestMB(state,mb_answer,pointstosend)
 {
-
     //go through all points, they are initialized in initializeMB()
     let ix //point index + 1 of x-axis
     let ii //point index +1 of imaginary-axis
@@ -281,7 +280,6 @@ let server = http.createServer(function(request, response)
     if(zoomfactorvalid == -1)
     {
         log("the zoom factor is too large")
-        response.write("id:"+id+"\n")
         response.write("data: zoomfactorinvalid\n\n")
         response.end()
         return
@@ -291,28 +289,35 @@ let server = http.createServer(function(request, response)
     //this interval writes the stream. It's an interval and not a while loop because it has to be asynchronous and non blocking to some degree
     let interval = null
     let requestcount = 0
-    interval = setInterval(function()
+
+    //interval because it has to send the data again and again
+    let running = true;
+    while(running)
     {
         if(request.socket._handle != null)
         {
             //if the client is unable to process all the messages
-            if(request.socket._handle.writeQueueSize <= 4)
+            if(request.socket._handle.writeQueueSize <= 10)
             {
                 //calculate now. The result of this call is, that in state the arrays are updated
                 requestMB(state,mb_answer)
 
+                if(requestcount%5 == 0 && requestcount != 0)
+                    log("iterations: "+requestcount)
+
                 //some statistical stuff
                 mb_answer.requestcount = requestcount
 
-                //now from the info in state, calculate the image and store it inside mb_answer
+                /*//now from the info in state, calculate the image and store it inside mb_answer
                 //store it as image and not as array in mb_answer because sending so much data at once is a very large bottleneck
                 //unfortunatelly encoding the image is a bottleneck aswell
-                storeasimage(state,mb_answer,id)
+                storeasimage(state,mb_answer,id)*/
+                mb_answer.allPointsB = state.allPointsB
                 //stringify the answer so that it can be sent to the client
+                mb_answer.id = id
                 answer = JSON.stringify(mb_answer)
 
                 //write
-                response.write("id:"+id+"\n")
                 response.write("data:"+answer+"\n\n")
 
                 //some statistical stuff
@@ -320,7 +325,7 @@ let server = http.createServer(function(request, response)
             }
             else
             {
-                clearInterval(interval);
+                running = false
                 log("closed because writeQueueSize is too lage; stream id: "+id)
                 //free up memory
                 state = {}
@@ -330,23 +335,23 @@ let server = http.createServer(function(request, response)
         }
         else
         {
-            clearInterval(interval);
+            running = false
             log("closed because _handle is null; stream id: "+id)
             //free up memory
             state = {}
             mb_answer = {}
             response.end()
         }
-    },1)
+    }
 
     request.connection.addListener("close", function ()
     {
-          clearInterval(interval);
-          log("client closed stream id: "+id)
-          //free up memory
-          state = {}
-          mb_answer = {}
-          response.end()
+        running = false
+        log("communicator closed stream id: "+id)
+        //free up memory
+        state = {}
+        mb_answer = {}
+        response.end()
     }, false);
     return 0
 })
@@ -354,70 +359,6 @@ let server = http.createServer(function(request, response)
 function log(msg)
 {
     console.log("[bud]: " + msg)
-}
-
-function storeasimage(state,mb_answer,id)
-{
-
-    //in this variable the colors will be concatinated in hexadecimal style
-    let decodedBmpData = ""
-
-    //variables that will hold the colors to concatinate
-    let v,r,g,b
-
-    //Some information for the encoder
-    let width = state.allPointsB.length
-    let height = state.allPointsB[0].length
-
-    //stretch means stretch on the v-axis (value of the BuddhabrotCounter).
-    //Higher stretch means darker image for low counter values but will also prevent clipping
-    //(clipping is already kinda countered by using the tanh curve which converges to 1 but never really touches it)
-    let stretch = 10000;
-
-    //create new img
-    for(let x = 0;x < width;x++)
-    {
-        for(let y = 0;y < height;y++)
-        {
-            //get the value that the colors are based on
-            v = state.allPointsB[x][y]
-
-            //step one: calculate r g b colors from v
-            r = Math.pow(Math.tanh(v/stretch),2)*255*0.8
-            g = Math.pow(Math.tanh(v/stretch),1)*255
-            b = Math.pow(Math.tanh(v/stretch),0.5)*255*0.9+25
-
-            //step two: convert it to hexadecimal
-            r = parseInt(r).toString(16).toUpperCase()
-            g = parseInt(g).toString(16).toUpperCase()
-            b = parseInt(b).toString(16).toUpperCase()
-            if(r.length == 1) r = "0" + r
-            if(g.length == 1) g = "0" + g
-            if(b.length == 1) b = "0" + b
-
-            //concatinate
-            v = r + g + b //RGB
-            decodedBmpData += v + "FF" //this string will get longer and longer. FF needs to be added for whatever reason
-        }
-    }
-
-    //now create the DEcoded image
-    var newimg = {
-        "data": new Buffer(decodedBmpData,"hex"),
-        "width": width,
-        "height": height
-    }
-    //and ENcode a new bmp from that
-    var newimgraw = bmp.encode(newimg) //encoded, that means the weird character sequences again
-
-    //store bmp
-    /*fs.writeFile("out"+id+".jpg", newimgraw.data, function(err) {
-        if(err) return log(err)
-        log("The file was saved!");
-    });*/
-
-    //write that image as base64 to the mb_answer object
-    mb_answer.image = new Buffer(newimgraw.data).toString('base64')
 }
 
 //wait for requests

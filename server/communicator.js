@@ -18,6 +18,7 @@ let server = http.createServer(function(clientrequest, clientresponse)
     //holds the answer that is being sent, in case the client does not want data but rather some file (index.html, style.css, script.js)
     let answer = ""
 
+    let status = "stopped"
     //if client requested data
     if (path.indexOf("db.json") != -1)
     {
@@ -39,40 +40,81 @@ let server = http.createServer(function(clientrequest, clientresponse)
         let interval = null
         let requestcount = 0
 
-        if(clientrequest.socket._handle != null)
+        interval = setTimeout(function()
         {
-            //if the client is unable to process all the messages
-            if(clientrequest.socket._handle.writeQueueSize <= 4)
+            if(clientrequest.socket._handle != null)
             {
-                //request from port 4000 as stream
-                log("opening stream id: "+id)
-                request.get("http://www.localhost:4000" + path).on("response", (buddharesponse) =>
+                //if the client is unable to process all the messages
+                if(clientrequest.socket._handle.writeQueueSize <= 4)
                 {
-                    log("received answer from buddha: "+buddharesponse.statusCode)
-                })
-                .on('data', (data) => {
-                    clientresponse.write(data)
-                }).on('error', (err) => { console.log(err) })
+                    //request from port 4000 as stream
+                    let completemessage = ""
+                    log("opening stream id: "+id)
+                    let buddharesponse
+                    request.get("http://www.localhost:4000" + path).on("response", (buddharesponsetmp) =>
+                    {
+                        buddharesponse = buddharesponsetmp
+                        log("stream status from buddha: "+buddharesponse.statusCode)
+                        if(buddharesponse.statusCode == 200)
+                            status = "running"
+                    })
+                    .on('data', (data) => {
+
+                        if(status == "stopped")
+                        {
+                            log("trying to stop buddha")
+                            buddharesponse.destroy()
+                            return
+                        }
+
+                        //convert the data buffer to a string
+                        let stringdata = data.toString()
+
+                        //check if the message is complete
+                        if(stringdata[stringdata.length-3] != "}")
+                        {
+                            //data not complete yet
+                            completemessage += stringdata
+                        }
+                        else
+                        {
+                            //if the stringdata ends with } that means that's the missing chunk of data
+                            completemessage += stringdata
+                            //remove "data:" from the front
+                            completemessage = completemessage.split("data:")[1]
+
+                            let mb_answer = JSON.parse(completemessage) //restore mb_answer
+                            storeasimage(mb_answer) //calculate the image from the points
+                            mb_answer.points = null //remove the points from mb_answer
+                            answer = JSON.stringify(mb_answer) //pack answer
+                            clientresponse.write("data: " + answer + "\n\n") //send the processed mb_answer
+
+                            //reset this temporary memory of incomplete messages
+                            completemessage = "";
+                        }
+
+                    }).on('error', (err) => { log(err) })
+                }
+                else
+                {
+                    status = "stopped"
+                    clearInterval(interval);
+                    log("closed because writeQueueSize is too lage; stream id: "+id)
+                    clientresponse.end()
+                }
             }
             else
             {
-                stop()
+                status = "stopped"
                 clearInterval(interval);
-                log("closed because writeQueueSize is too lage; stream id: "+id)
+                log("closed because _handle is null; stream id: "+id)
                 clientresponse.end()
             }
-        }
-        else
-        {
-            stop()
-            clearInterval(interval);
-            log("closed because _handle is null; stream id: "+id)
-            clientresponse.end()
-        }
+        },1)
 
         clientrequest.connection.addListener("close", function ()
         {
-            stop()
+            status = "stopped"
             clearInterval(interval)
             log("client closed stream id: "+id)
             clientresponse.end()
@@ -108,7 +150,7 @@ function stop()
     //TODO tell port 4000 to stop calculating images
 }
 
-function storeasimage(state,mb_answer,id)
+function storeasimage(mb_answer)
 {
 
     //in this variable the colors will be concatinated in hexadecimal style
@@ -118,8 +160,8 @@ function storeasimage(state,mb_answer,id)
     let v,r,g,b
 
     //Some information for the encoder
-    let width = state.allPointsB.length
-    let height = state.allPointsB[0].length
+    let width = mb_answer.allPointsB.length
+    let height = mb_answer.allPointsB[0].length
 
     //stretch means stretch on the v-axis (value of the BuddhabrotCounter).
     //Higher stretch means darker image for low counter values but will also prevent clipping
@@ -132,7 +174,7 @@ function storeasimage(state,mb_answer,id)
         for(let y = 0;y < height;y++)
         {
             //get the value that the colors are based on
-            v = state.allPointsB[x][y]
+            v = mb_answer.allPointsB[x][y]
 
             //step one: calculate r g b colors from v
             r = Math.pow(Math.tanh(v/stretch),2)*255*0.8
