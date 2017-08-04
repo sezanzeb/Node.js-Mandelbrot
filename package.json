@@ -4,8 +4,12 @@
   "description": "",
   "main": "cluster.js",
   "scripts": {
-    "start": "node cluster.js"
+    "start": "node server/start.js"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "bmp-js": "0.0.3",
+    "request": "^2.81.0"
+  }
 }

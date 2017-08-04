@@ -1,6 +1,5 @@
 "use strict"
 
-let fs = require('fs')
 let http = require("http")
 let bmp = require("bmp-js")
 
@@ -51,7 +50,7 @@ function iterate(point,mand_iterations)
 
 function parseurl(path)
 {
-    console.log(path)
+    log(path)
     //get parameters from the url
     let params = decodeGetParams(path)
     let zoom = parseFloat(params.zoom)
@@ -259,123 +258,103 @@ let server = http.createServer(function(request, response)
 {
     //understand the request
     let path = request.url
-    if(path == "/")
-        path = "/index.html"
-    console.log("request for "+path)
 
     //holds the answer that is being sent, in case the client does not want data but rather some file (index.html, style.css, script.js)
     let answer = ""
 
-    //if client requested data
-    if (path.indexOf("db.json") != -1)
+    //initialize the connection
+    log("communicator requesting stream")
+    response.writeHead(200, {"Content-Type":"text/event-stream", "Cache-Control":"no-cache", "Connection":"keep-alive"})
+    response.write('\n\n');
+
+    //get some parameters, initialize stuff
+    let parsed = parseurl(path)
+    let mb_answer = parsed.mb_answer
+    let id = parsed.id
+    let state = parsed.state
+    state.allPointsC = []
+    state.allPointsZ = []
+    state.allPointsB = []
+
+    //initialize all the points that are going to be iterated. returns the amount of points
+    let zoomfactorvalid = initializeMB(state,mb_answer)
+    if(zoomfactorvalid == -1)
     {
+        log("the zoom factor is too large")
+        response.write("id:"+id+"\n")
+        response.write("data: zoomfactorinvalid\n\n")
+        response.end()
+        return
+    }
 
-        //initialize the connection
-        console.log("client requesting stream")
-        response.writeHead(200, {"Content-Type":"text/event-stream", "Cache-Control":"no-cache", "Connection":"keep-alive"})
-        response.write('\n\n');
-
-        //get some parameters, initialize stuff
-        let parsed = parseurl(path)
-        let mb_answer = parsed.mb_answer
-        let id = parsed.id
-        let state = parsed.state
-        state.allPointsC = []
-        state.allPointsZ = []
-        state.allPointsB = []
-
-        //initialize all the points that are going to be iterated. returns the amount of points
-        let zoomfactorvalid = initializeMB(state,mb_answer)
-        if(zoomfactorvalid == -1)
+    //as long as the client is active, iterate the points, that initializeMB created
+    //this interval writes the stream. It's an interval and not a while loop because it has to be asynchronous and non blocking to some degree
+    let interval = null
+    let requestcount = 0
+    interval = setInterval(function()
+    {
+        if(request.socket._handle != null)
         {
-            console.log("the zoom factor is too large")
-            response.write("id:"+id+"\n")
-            response.write("data: zoomfactorinvalid\n\n")
-            response.end()
-            return
-        }
-
-        //as long as the client is active, iterate the points, that initializeMB created
-        //this interval writes the stream. It's an interval and not a while loop because it has to be asynchronous and non blocking to some degree
-        let interval = null
-        let requestcount = 0
-        interval = setInterval(function()
-        {
-            if(request.socket._handle != null)
+            //if the client is unable to process all the messages
+            if(request.socket._handle.writeQueueSize <= 4)
             {
-                //if the client is unable to process all the messages
-                if(request.socket._handle.writeQueueSize <= 4)
-                {
-                    //calculate now. The result of this call is, that in state the arrays are updated
-                    requestMB(state,mb_answer)
+                //calculate now. The result of this call is, that in state the arrays are updated
+                requestMB(state,mb_answer)
 
-                    //some statistical stuff
-                    mb_answer.requestcount = requestcount
+                //some statistical stuff
+                mb_answer.requestcount = requestcount
 
-                    //now from the info in state, calculate the image and store it inside mb_answer
-                    //store it as image and not as array in mb_answer because sending so much data at once is a very large bottleneck
-                    //unfortunatelly encoding the image is a bottleneck aswell
-                    storeasimage(state,mb_answer,id)
-                    //stringify the answer so that it can be sent to the client
-                    answer = JSON.stringify(mb_answer)
+                //now from the info in state, calculate the image and store it inside mb_answer
+                //store it as image and not as array in mb_answer because sending so much data at once is a very large bottleneck
+                //unfortunatelly encoding the image is a bottleneck aswell
+                storeasimage(state,mb_answer,id)
+                //stringify the answer so that it can be sent to the client
+                answer = JSON.stringify(mb_answer)
 
-                    //write
-                    response.write("id:"+id+"\n")
-                    response.write("data:"+answer+"\n\n")
+                //write
+                response.write("id:"+id+"\n")
+                response.write("data:"+answer+"\n\n")
 
-                    //some statistical stuff
-                    requestcount ++
-                }
-                else
-                {
-                    clearInterval(interval);
-                    console.log("closed because writeQueueSize is too lage; stream id: "+id)
-                    //free up memory
-                    state = {}
-                    mb_answer = {}
-                    response.end()
-                }
+                //some statistical stuff
+                requestcount ++
             }
             else
             {
                 clearInterval(interval);
-                console.log("closed because _handle is null; stream id: "+id)
+                log("closed because writeQueueSize is too lage; stream id: "+id)
                 //free up memory
                 state = {}
                 mb_answer = {}
                 response.end()
             }
-        },1)
-
-        request.connection.addListener("close", function ()
-        {
-              clearInterval(interval);
-              console.log("client closed stream id: "+id)
-              //free up memory
-              state = {}
-              mb_answer = {}
-              response.end()
-        }, false);
-        return 0
-    }
-    else
-    {
-        //you should use asynchronous file reads in nodejs for actual webservices in production
-        if(path.indexOf("/db.json") != 0)
-        {
-            if (fs.existsSync("public"+path)) {
-                let html = fs.readFileSync("public"+path,"utf-8").toString()
-                response.writeHead(200, {"Content-Type": "text/html"})
-                answer = html
-            }
         }
+        else
+        {
+            clearInterval(interval);
+            log("closed because _handle is null; stream id: "+id)
+            //free up memory
+            state = {}
+            mb_answer = {}
+            response.end()
+        }
+    },1)
 
-        //send answer to client
-        //this covers mandelbrot points as well as index.html, style.css and script.js
-        response.write(answer)
-        response.end()
-    }
+    request.connection.addListener("close", function ()
+    {
+          clearInterval(interval);
+          log("client closed stream id: "+id)
+          //free up memory
+          state = {}
+          mb_answer = {}
+          response.end()
+    }, false);
+    return 0
 })
+
+function log(msg)
+{
+    console.log("[bud]: " + msg)
+}
 
 function storeasimage(state,mb_answer,id)
 {
@@ -433,8 +412,8 @@ function storeasimage(state,mb_answer,id)
 
     //store bmp
     /*fs.writeFile("out"+id+".jpg", newimgraw.data, function(err) {
-        if(err) return console.log(err)
-        console.log("The file was saved!");
+        if(err) return log(err)
+        log("The file was saved!");
     });*/
 
     //write that image as base64 to the mb_answer object
@@ -444,11 +423,41 @@ function storeasimage(state,mb_answer,id)
 //wait for requests
 let port = 4000
 server.listen(port)
-console.log("listening on port "+port+"...")
+log("listening on port "+port+"...")
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
 
 
 
