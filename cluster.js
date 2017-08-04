@@ -1,6 +1,7 @@
 var cluster = require('cluster')
 //var numCPUs = require('os').cpus().length
 var numCPUs = 4
+global.asdf = 1
 if (cluster.isMaster)
 {
     console.log("starting 4 processes")

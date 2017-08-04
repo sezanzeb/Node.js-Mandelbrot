@@ -172,7 +172,7 @@ function request(url,movex,movey,id)
                 //parse data that the client received from the server
                 var result = JSON.parse(e.data)
 
-                if(result.requestcount > 500)
+                if(result.requestcount > 50)
                 {
                     source[id].close()
                     activestreams --

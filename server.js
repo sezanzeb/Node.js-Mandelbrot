@@ -65,6 +65,11 @@ function parseurl(path)
     let id = parseInt(params.id)
 
     let mb_answer = {
+        "image":"",
+        "requestcount":0
+    }
+
+    let state = {
         "maxx":maxx,
         "maxi":maxi,
         "minx":minx,
@@ -74,29 +79,29 @@ function parseurl(path)
         "zoom":zoom,
         "length":0,
         "requestcount":0,
-        "points":[], //points that changed (diverged) go here
         "iterations":40,
         "size":size
     }
 
-    return {mb_answer,size,id}
+    return {mb_answer,size,id,state}
 }
 
+//create the arrays and stuff for the calculation
 function initializeMB(state,mb_answer)
 {
-    let width = Math.abs(mb_answer.maxx-mb_answer.minx)
-    let height = Math.abs(mb_answer.maxi-mb_answer.mini)
-    let stepi = height/mb_answer.size
-    let stepx = width/mb_answer.size
+    let width = Math.abs(state.maxx-state.minx)
+    let height = Math.abs(state.maxi-state.mini)
+    let stepi = height/state.size
+    let stepx = width/state.size
     let pointsinuse = 0
 
     //check if this loop will ever come to an end. An issue that might be the case for very large zoom factors
     if(1-stepx == 1)
         return -1
 
-    state.allPointsC = new Array(mb_answer.size) //contains the counter for buddhabrot e.g [67,132] = 5
-    state.allPointsZ = new Array(mb_answer.size) //contains tuples for the logic coordinate system. e.g. [57,142] = [0.12,-0.87]
-    state.allPointsB = new Array(mb_answer.size) //iteration of mandelbrot results, means to which point in the logic coordinate system the point moves. e.g. [47,97] = [0.22,-0.76]
+    state.allPointsC = new Array(state.size) //contains the counter for buddhabrot e.g [67,132] = 5
+    state.allPointsZ = new Array(state.size) //contains tuples for the logic coordinate system. e.g. [57,142] = [0.12,-0.87]
+    state.allPointsB = new Array(state.size) //iteration of mandelbrot results, means to which point in the logic coordinate system the point moves. e.g. [47,97] = [0.22,-0.76]
 
     //each item inside answer.points will get a unique identifier
     let pointNr = 0
@@ -104,24 +109,24 @@ function initializeMB(state,mb_answer)
     //iterate over each point in the visible coordinate system
     //logic position counters
     let ci //is going to be set inside the loop
-    let cx = mb_answer.minx
+    let cx = state.minx
 
     //indexes
     //px position counters - 1
     let ii = 0
     let ix = 0
 
-    while(cx <= mb_answer.maxx)
+    while(cx <= state.maxx)
     {
 
         //2D array of all pixels
-        state.allPointsC[ix] = new Array(mb_answer.size)
-        state.allPointsZ[ix] = new Array(mb_answer.size)
-        state.allPointsB[ix] = new Array(mb_answer.size)
+        state.allPointsC[ix] = new Array(state.size)
+        state.allPointsZ[ix] = new Array(state.size)
+        state.allPointsB[ix] = new Array(state.size)
 
-        ci = mb_answer.mini
+        ci = state.mini
         ii = 0
-        while(ci <= mb_answer.maxi)
+        while(ci <= state.maxi)
         {
             //add every point to state.allPoints
             state.allPointsC[ix][ii] = [
@@ -147,11 +152,14 @@ function initializeMB(state,mb_answer)
     return 1
 }
 
-function interpolateBuddhacounter(x,i,params,state)
+//prevents aliasing. As the z values (x and i in this case) hold very accurate information
+//interpolation is possible, because the z values are "inbetween" pixels because they are so accurate
+//no supersubsampling needed therefore
+function interpolateBuddhacounter(x,i,state)
 {
     //convert to px coordinate system, but don't round it
-    x = (x-params.minx)*params.size/params.width
-    i = (i-params.mini)*params.size/params.height
+    x = (x-state.minx)*state.size/state.width
+    i = (i-state.mini)*state.size/state.height
 
     //increment state.allPointsB according to interpolation
     let x_ri = Math.ceil(x)
@@ -180,6 +188,7 @@ function interpolateBuddhacounter(x,i,params,state)
     return -1
 }
 
+//if it interpolates over the boundaries of the 2D array for the pixelated information, break
 function trytoadd(state,x,i,w)
 {
     if(state.allPointsB[x] != undefined && state.allPointsB[x][i] != undefined)
@@ -190,11 +199,11 @@ function trytoadd(state,x,i,w)
     return -1
 }
 
-//calculate one mandelbrot iteration
+//calculate one mandelbrot iteration. I could ofcourse aswell just calculate all at once but
+//the nice thing about this software is that it builds up on the screen. so this function will be called a few times
+//and then the result will be written to the client
 function requestMB(state,mb_answer,pointstosend)
 {
-    //index inside the array that is being sent to the client
-    let divergedPointsCount = 0
 
     //go through all points, they are initialized in initializeMB()
     let ix //point index + 1 of x-axis
@@ -219,11 +228,11 @@ function requestMB(state,mb_answer,pointstosend)
                 //then do a mandelbrot iteration
                 //do a few iteration, each time update Buddhabrot values
                 let i
-                for(i = 0;i < mb_answer.iterations;i++)
+                for(i = 0;i < state.iterations;i++)
                 {
 
                     //mb_answer contains min and width info
-                    if(interpolateBuddhacounter(zx,zi,mb_answer,state) == -1)
+                    if(interpolateBuddhacounter(zx,zi,state) == -1)
                     {
                         state.allPointsC[ix][ii] = undefined
                         break
@@ -243,12 +252,9 @@ function requestMB(state,mb_answer,pointstosend)
             }
         }
     }
-
-    //take slice from state.allPointsC and store it inside mb_answer
-    state.allPointsB = state.allPointsB
-    mb_answer.length = divergedPointsCount
 }
 
+//create the server that sends the buddhabrot data to the client
 let server = http.createServer(function(request, response)
 {
     //understand the request
@@ -270,11 +276,10 @@ let server = http.createServer(function(request, response)
         response.write('\n\n');
 
         //get some parameters, initialize stuff
-        let calculateTime = new Date().getTime()
         let parsed = parseurl(path)
         let mb_answer = parsed.mb_answer
         let id = parsed.id
-        let state = {}
+        let state = parsed.state
         state.allPointsC = []
         state.allPointsZ = []
         state.allPointsB = []
@@ -301,34 +306,25 @@ let server = http.createServer(function(request, response)
                 //if the client is unable to process all the messages
                 if(request.socket._handle.writeQueueSize <= 4)
                 {
-                    //calculate now
+                    //calculate now. The result of this call is, that in state the arrays are updated
                     requestMB(state,mb_answer)
-                    //perform the sending of the data asynchronous
-                    if(state.allPointsB.length > 0)
-                    {
-                        //send the calculated array
-                        mb_answer["requestcount"] = requestcount
-                        calculateTime = new Date().getTime()
-                        storeasimage(state,mb_answer,id)
-                        answer = JSON.stringify(mb_answer)
 
-                        response.write("id:"+id+"\n")
-                        response.write("data:"+answer+"\n\n")
-                        requestcount ++
-                    }
-                    else
-                    {
-                        //if no point has been found within 5 seconds, close the stream
-                        if(new Date().getTime() - calculateTime > 1000)
-                        {
-                            clearInterval(interval);
-                            console.log("no more points found timeout for stream id: "+id)
-                            //free up memory
-                            state = {}
-                            mb_answer = {}
-                            response.end()
-                        }
-                    }
+                    //some statistical stuff
+                    mb_answer.requestcount = requestcount
+
+                    //now from the info in state, calculate the image and store it inside mb_answer
+                    //store it as image and not as array in mb_answer because sending so much data at once is a very large bottleneck
+                    //unfortunatelly encoding the image is a bottleneck aswell
+                    storeasimage(state,mb_answer,id)
+                    //stringify the answer so that it can be sent to the client
+                    answer = JSON.stringify(mb_answer)
+
+                    //write
+                    response.write("id:"+id+"\n")
+                    response.write("data:"+answer+"\n\n")
+
+                    //some statistical stuff
+                    requestcount ++
                 }
                 else
                 {
@@ -384,10 +380,19 @@ let server = http.createServer(function(request, response)
 function storeasimage(state,mb_answer,id)
 {
 
+    //in this variable the colors will be concatinated in hexadecimal style
     let decodedBmpData = ""
+
+    //variables that will hold the colors to concatinate
     let v,r,g,b
+
+    //Some information for the encoder
     let width = state.allPointsB.length
     let height = state.allPointsB[0].length
+
+    //stretch means stretch on the v-axis (value of the BuddhabrotCounter).
+    //Higher stretch means darker image for low counter values but will also prevent clipping
+    //(clipping is already kinda countered by using the tanh curve which converges to 1 but never really touches it)
     let stretch = 10000;
 
     //create new img
@@ -395,30 +400,35 @@ function storeasimage(state,mb_answer,id)
     {
         for(let y = 0;y < height;y++)
         {
+            //get the value that the colors are based on
             v = state.allPointsB[x][y]
 
+            //step one: calculate r g b colors from v
             r = Math.pow(Math.tanh(v/stretch),2)*255*0.8
             g = Math.pow(Math.tanh(v/stretch),1)*255
             b = Math.pow(Math.tanh(v/stretch),0.5)*255*0.9+25
 
+            //step two: convert it to hexadecimal
             r = parseInt(r).toString(16).toUpperCase()
             g = parseInt(g).toString(16).toUpperCase()
             b = parseInt(b).toString(16).toUpperCase()
-
             if(r.length == 1) r = "0" + r
             if(g.length == 1) g = "0" + g
             if(b.length == 1) b = "0" + b
+
+            //concatinate
             v = r + g + b //RGB
-            decodedBmpData += v + "FF"
+            decodedBmpData += v + "FF" //this string will get longer and longer. FF needs to be added for whatever reason
         }
     }
 
+    //now create the DEcoded image
     var newimg = {
         "data": new Buffer(decodedBmpData,"hex"),
         "width": width,
         "height": height
     }
-    //create new bmp from that
+    //and ENcode a new bmp from that
     var newimgraw = bmp.encode(newimg) //encoded, that means the weird character sequences again
 
     //store bmp
@@ -427,7 +437,8 @@ function storeasimage(state,mb_answer,id)
         console.log("The file was saved!");
     });*/
 
-    mb_answer["image"] = new Buffer(newimgraw.data).toString('base64')
+    //write that image as base64 to the mb_answer object
+    mb_answer.image = new Buffer(newimgraw.data).toString('base64')
 }
 
 //wait for requests
