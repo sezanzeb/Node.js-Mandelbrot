@@ -14,4 +14,4 @@
       npm start
       #then open Firefox or Chromium and visit localhost:4000
 
-![Screenshot](https://github.com/sezanzeb/Node.js-Mandelbrot/raw/buddhabrot/buddhabrot.png)
+![Screenshot](https://github.com/sezanzeb/Node.js-Mandelbrot/blob/Buddhabrot/buddhabrot.png)
