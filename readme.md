@@ -12,6 +12,6 @@
 
       npm install
       npm start
-      #then open Firefox or Chromium and visit localhost:4000
+      #then open Firefox or Chromium and visit localhost:4001
 
 ![Screenshot](https://github.com/sezanzeb/Node.js-Mandelbrot/blob/Buddhabrot/buddhabrot.png)
