@@ -15,3 +15,5 @@
       #then open Firefox or Chromium and visit localhost:4001
 
 ![Screenshot](https://github.com/sezanzeb/Node.js-Mandelbrot/blob/Buddhabrot/buddhabrot.png)
+
+Comfortaa-Regular.ttf: Copyright 2011 The Comfortaa Project Authors (aajohan@gmail.com), with Reserved Font Name "Comfortaa".
