@@ -161,19 +161,19 @@ function interpolateBuddhacounter(x,i,state)
     i = (i-state.mini)*state.size/state.height
 
     //increment state.allPointsB according to interpolation
-    let x_ri = Math.ceil(x)
-    let i_up = Math.ceil(i)
-    let x_le = Math.floor(x)
-    let i_do = Math.floor(i)
+    //a_bc is the information about the nearby pixels positions, x and i is the accurate position of the iterated point
+    let x_ri = Math.ceil(x) //right
+    let i_up = Math.ceil(i) //up
+    let x_le = Math.floor(x) //left
+    let i_do = Math.floor(i) //down
 
     //those 4 integers represent the boundaries of the 4 pixels that need to be interpolated
 
-    //now get the weights. it's the rectangle area between the point x,i and the edge
-    //make sure it's positive and substract it from one, because large area means x,i is far away from that edge
-    let w00 = 1-Math.abs((x_le-x) * (i_do-i))
-    let w01 = 1-Math.abs((x_le-x) * (i_up-i))
-    let w10 = 1-Math.abs((x_ri-x) * (i_do-i))
-    let w11 = 1-Math.abs((x_ri-x) * (i_up-i))
+    //now get the weights. it's the rectangle area between the point x,i and the OPPOSITE(diagonal) edge of the pixel in question
+    let w00 = Math.abs((x_ri-x) * (i_up-i)) //bottom left edge weight
+    let w01 = Math.abs((x_ri-x) * (i_do-i)) //top left edge weight
+    let w10 = Math.abs((x_le-x) * (i_up-i)) //bottom right edge weight
+    let w11 = Math.abs((x_le-x) * (i_do-i)) //top right edge weight
 
     //now add the weights from the positions in state.allPointsB
     //the indices might not exist, that's why try catch
@@ -182,7 +182,7 @@ function interpolateBuddhacounter(x,i,state)
     if(trytoadd(state,x_ri,i_do,w10) == 1)
     if(trytoadd(state,x_le,i_up,w01) == 1)
     if(trytoadd(state,x_le,i_do,w00) == 1)
-        return 1
+        return 1 //success
 
     return -1
 }
@@ -275,7 +275,7 @@ let server = http.createServer(function(request, response)
     state.allPointsB = []
 
     log("communicator requesting raw data. opening stream id: "+id)
-    
+
     //initialize all the points that are going to be iterated. returns the amount of points
     let zoomfactorvalid = initializeMB(state,mb_answer)
     if(zoomfactorvalid == -1)
