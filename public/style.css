@@ -1,8 +1,11 @@
+@import url('https://fonts.googleapis.com/css?family=Comfortaa');
+
 body
 {
-    font-family: open-sans,sans-serif,arial;
+    font-family: "Comfortaa",open-sans,sans-serif,arial;
     padding: 70px 20px;
-    background: #271e2f;
+    background: #d6d6d6;
+    color: #041e4c;
 }
 
 .hidden
@@ -21,7 +24,6 @@ body
 h1, h2
 {
     text-align:center;
-    color: white;
 }
 
 form {
@@ -111,6 +113,7 @@ input {
 
 input, button {
     height: 28px;
+    text-align:center;
 }
 
 #plot li

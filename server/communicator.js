@@ -166,7 +166,7 @@ function storeasimage(mb_answer)
     //stretch means stretch on the v-axis (value of the BuddhabrotCounter).
     //Higher stretch means darker image for low counter values but will also prevent clipping
     //(clipping is already kinda countered by using the tanh curve which converges to 1 but never really touches it)
-    let stretch = 10000;
+    let stretch = 4000;
 
     //create new img
     for(let x = 0;x < width;x++)
@@ -177,9 +177,9 @@ function storeasimage(mb_answer)
             v = mb_answer.allPointsB[x][y]
 
             //step one: calculate r g b colors from v
-            r = Math.pow(Math.tanh(v/stretch),2)*255*0.8
-            g = Math.pow(Math.tanh(v/stretch),1)*255
-            b = Math.pow(Math.tanh(v/stretch),0.5)*255*0.9+25
+            b = (255-Math.pow(Math.tanh(v/stretch),2)*255)*0.3
+            g = Math.pow(Math.tanh(v/stretch),2)*225+30
+            r = Math.pow(Math.tanh(v/stretch),0.5)*255
 
             //step two: convert it to hexadecimal
             r = parseInt(r).toString(16).toUpperCase()
